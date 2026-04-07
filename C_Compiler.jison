@@ -1,219 +1,189 @@
+%{
+/* =======================
+   SEMÂNTICA (PARTE 2)
+======================= */
+var tabela = {};
+%}
+
 %lex
-
 %%
 
-\s+                                 {/* ignorar espaços */}
+\s+                     /* ignora espaços */
+"//".*
+\/\*[^*]*\*+([^/*][^*]*\*+)*\/
+\n                      /* ignora quebra de linha */
 
-/* ===== COMENTÁRIOS ===== */
-"//".*                              {/* comentário de linha */}
-"/*"[^*]*"*"+([^/*][^*]*"*"+)*"/"   {/* comentário de bloco */}
+\#include[^\n]*         return 'INCLUDE';
+\#define[^\n]*          return 'DEFINE';
 
-/* ===== DIRETIVAS ===== */
-"#include"                          {return 'INCLUDE';}
-"#define"                           {return 'DEFINE';}
+"if"        return 'IF';
+"else"      return 'ELSE';
+"while"     return 'WHILE';
+"for"       return 'FOR';
 
-/* ===== PALAVRAS RESERVADAS ===== */
-"auto"      {return 'AUTO';}
-"break"     {return 'BREAK';}
-"case"      {return 'CASE';}
-"char"      {return 'CHAR';}
-"const"     {return 'CONST';}
-"continue"  {return 'CONTINUE';}
-"default"   {return 'DEFAULT';}
-"do"        {return 'DO';}
-"double"    {return 'DOUBLE';}
-"else"      {return 'ELSE';}
-"enum"      {return 'ENUM';}
-"extern"    {return 'EXTERN';}
-"float"     {return 'FLOAT';}
-"for"       {return 'FOR';}
-"goto"      {return 'GOTO';}
-"if"        {return 'IF';}
-"int"       {return 'INT';}
-"long"      {return 'LONG';}
-"register"  {return 'REGISTER';}
-"return"    {return 'RETURN';}
-"short"     {return 'SHORT';}
-"signed"    {return 'SIGNED';}
-"sizeof"    {return 'SIZEOF';}
-"static"    {return 'STATIC';}
-"struct"    {return 'STRUCT';}
-"switch"    {return 'SWITCH';}
-"typedef"   {return 'TYPEDEF';}
-"union"     {return 'UNION';}
-"unsigned"  {return 'UNSIGNED';}
-"void"      {return 'VOID';}
-"volatile"  {return 'VOLATILE';}
-"while"     {return 'WHILE';}
+"int"       return 'INT_TYPE';
+"float"     return 'FLOAT_TYPE';
+"char"      return 'CHAR_TYPE';
 
-/* ===== OPERADORES ===== */
-"==" {return 'EQ';}
-"!=" {return 'NE';}
-">=" {return 'GE';}
-"<=" {return 'LE';}
-"&&" {return 'AND';}
-"\|\|" {return 'OR';}
-"++" {return 'INC';}
-"--" {return 'DEC';}
+"="         return '=';
+"<"         return '<';
+">"         return '>';
+"+"         return '+';
+"-"         return '-';
+"*"         return '*';
+"/"         return '/';
 
-"+"  {return '+';}
-"-"  {return '-';}
-"*"  {return '*';}
-"/"  {return '/';}
-"%"  {return '%';}
-">"  {return '>';}
-"<"  {return '<';}
-"="  {return '=';}
-"!"  {return '!';}
+"("         return '(';
+")"         return ')';
+"{"         return '{';
+"}"         return '}';
+";"         return ';';
+","         return ',';
 
-/* ===== DELIMITADORES ===== */
-";" {return ';';}
-"," {return ',';}
-"\(" {return '(';}
-"\)" {return ')';}
-"\{" {return '{';}
-"\}" {return '}';}
-"\[" {return '[';}
-"\]" {return ']';}
+[0-9]+\.[0-9]+      { yytext = Number(yytext); return 'FLOAT'; }
+[0-9]+              { yytext = Number(yytext); return 'NUM'; }
 
-/* ===== LITERAIS ===== */
-\"([^\\\"]|\\.)*\"                 {return 'STRING_LIT';}
-"'"[^']"'"                         {return 'CHAR_LIT';}
-[0-9]*\.[0-9]+([eE][+-]?[0-9]+)?  {return 'F_LIT';}
-[0-9]+                            {return 'INT_LIT';}
+[a-zA-Z_][a-zA-Z0-9_]*  return 'ID';
 
-/* ===== IDENTIFICADOR ===== */
-[a-zA-Z_][a-zA-Z0-9_]*            {return 'IDF';}
+.   { throw new Error("Caractere inválido: " + yytext); }
 
-/* ===== ERRO ===== */
-. {console.log("Erro léxico:", yytext);}
+<<EOF>>             return 'EOF';
 
-/* EOF */
-<<EOF>> {return 'EOF';}
-
-%%
 /lex
 
 %start programa
 
 %left '+' '-'
 %left '*' '/'
-%left '>' '<' GE LE EQ NE
+%left '<' '>'
+%nonassoc LOWER_THAN_ELSE
+%nonassoc ELSE
 
 %%
 
 programa
-    : lista_declaracoes EOF
+    : diretivas comandos EOF
+    {
+        console.log("\n✅ Programa reconhecido com sucesso");
+
+        console.log("\n📜 Tabela de símbolos:");
+        console.table(tabela);
+    }
+    | diretivas EOF
     ;
 
-lista_declaracoes
-    : lista_declaracoes declaracao
-    | declaracao
+diretivas
+    : diretivas diretiva
+    | /* vazio */
+    ;
+
+diretiva
+    : INCLUDE   { console.log("🔹 Encontrou #include"); }
+    | DEFINE    { console.log("🔹 Encontrou #define"); }
+    ;
+
+comandos
+    : comandos comando
+    | comando
+    ;
+
+comando
+    : declaracao
+    | atribuicao
+    | if_stmt
+    | while_stmt
+    | for_stmt
+    | bloco
     ;
 
 declaracao
-    : declaracao_variavel ';'
-    | atribuicao ';'
-    | if_stmt
-    | loop_stmt
-    | switch_stmt
-    | include_stmt
-    | define_stmt
+    : tipo ID ';'
+    {
+        if (tabela[$2]) {
+            console.log("❌ Erro: variável já declarada ->", $2);
+        } else {
+            tabela[$2] = $1;
+            console.log("🟢 Declaração:", $2, "| tipo:", $1);
+        }
+    }
+    | tipo ID '=' expressao ';'
+    {
+        if (tabela[$2]) {
+            console.log("❌ Erro: variável já declarada ->", $2);
+        } else {
+            tabela[$2] = $1;
+
+            if ($1 !== $4) {
+                console.log("⚠️ Tipo diferente na inicialização:", $1, "=", $4);
+            }
+
+            console.log("🟢 Declaração com valor:", $2);
+        }
+    }
     ;
 
-/* ===== INCLUDE / DEFINE ===== */
-
-include_stmt
-    : INCLUDE '<' IDF '>'
-      {console.log("INCLUDE detectado");}
+atribuicao
+    : ID '=' expressao ';'
+    {
+        if (!tabela[$1]) {
+            console.log("❌ Erro: variável não declarada ->", $1);
+        } else {
+            if (tabela[$1] !== $3) {
+                console.log("⚠️ Tipo diferente:", tabela[$1], "=", $3);
+            }
+            console.log("🟡 Atribuição:", $1);
+        }
+    }
     ;
 
-define_stmt
-    : DEFINE IDF valor
-      {console.log("DEFINE detectado");}
+if_stmt
+    : IF '(' expressao ')' comando %prec LOWER_THAN_ELSE
+        { console.log("🔵 IF"); }
+    | IF '(' expressao ')' comando ELSE comando
+        { console.log("🔵 IF-ELSE"); }
     ;
 
-/* ===== VARIÁVEL ===== */
+while_stmt
+    : WHILE '(' expressao ')' comando
+        { console.log("🟣 WHILE"); }
+    ;
 
-declaracao_variavel
-    : tipo IDF
-      {console.log("Declaração de variável");}
-    | tipo IDF '=' expressao
-      {console.log("Declaração com inicialização");}
+for_stmt
+    : FOR '(' ID '=' expressao ';' expressao ';' expressao ')' comando
+        { console.log("🟠 FOR"); }
+    ;
+
+bloco
+    : '{' comandos '}'
+        { console.log("📦 Bloco"); }
     ;
 
 tipo
-    : INT | FLOAT | DOUBLE | CHAR | VOID
-    | LONG | SHORT | SIGNED | UNSIGNED
+    : INT_TYPE     { $$ = 'int'; }
+    | FLOAT_TYPE   { $$ = 'float'; }
+    | CHAR_TYPE    { $$ = 'char'; }
     ;
 
-/* ===== ATRIBUIÇÃO ===== */
-
-atribuicao
-    : IDF '=' expressao
-      {console.log("Atribuição");}
-    ;
-
-/* ===== IF ===== */
-
-if_stmt
-    : IF '(' expressao ')' '{' lista_declaracoes '}'
-      {console.log("IF");}
-    | IF '(' expressao ')' '{' lista_declaracoes '}' ELSE '{' lista_declaracoes '}'
-      {console.log("IF ELSE");}
-    ;
-
-/* ===== LOOPS ===== */
-
-loop_stmt
-    : WHILE '(' expressao ')' '{' lista_declaracoes '}'
-      {console.log("WHILE");}
-    | DO '{' lista_declaracoes '}' WHILE '(' expressao ')' ';'
-      {console.log("DO WHILE");}
-    | FOR '(' atribuicao ';' expressao ';' atribuicao ')' '{' lista_declaracoes '}'
-      {console.log("FOR");}
-    ;
-
-/* ===== SWITCH ===== */
-
-switch_stmt
-    : SWITCH '(' IDF ')' '{' case_list '}'
-      {console.log("SWITCH");}
-    ;
-
-case_list
-    : case_list case_item
-    | case_item
-    ;
-
-case_item
-    : CASE valor ':' lista_declaracoes
-      {console.log("CASE");}
-    | DEFAULT ':' lista_declaracoes
-      {console.log("DEFAULT");}
-    ;
-
-/* ===== EXPRESSÕES ===== */
-
+/* EXPRESSÃO COM TIPO */
 expressao
-    : expressao '+' expressao
-    | expressao '-' expressao
-    | expressao '*' expressao
-    | expressao '/' expressao
-    | expressao '>' expressao
-    | expressao '<' expressao
-    | expressao GE expressao
-    | expressao LE expressao
-    | expressao EQ expressao
-    | expressao NE expressao
-    | '(' expressao ')'
-    | valor
-    | IDF
-    ;
+    : expressao '+' expressao   { $$ = 'int'; }
+    | expressao '-' expressao   { $$ = 'int'; }
+    | expressao '*' expressao   { $$ = 'int'; }
+    | expressao '/' expressao   { $$ = 'int'; }
+    | expressao '>' expressao   { $$ = 'int'; }
+    | expressao '<' expressao   { $$ = 'int'; }
+    | '(' expressao ')'         { $$ = $2; }
 
-valor
-    : INT_LIT
-    | F_LIT
-    | CHAR_LIT
-    | STRING_LIT
+    | NUM                       { $$ = 'int'; }
+    | FLOAT                     { $$ = 'float'; }
+
+    | ID
+    {
+        if (!tabela[$1]) {
+            console.log("❌ Erro: variável não declarada ->", $1);
+            $$ = null;
+        } else {
+            $$ = tabela[$1];
+        }
+    }
     ;
