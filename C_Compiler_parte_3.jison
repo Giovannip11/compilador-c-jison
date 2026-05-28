@@ -34,7 +34,7 @@ function processarExpressao(no) {
     if (no.tipo === 'ID') {
         let t = buscarTipo(no.valor);
         if (!t) {
-            erros.push("❌ Erro semântico: Variável não declarada -> " + no.valor);
+            erros.push(" Erro semântico: Variável não declarada -> " + no.valor);
             return { tipo: null, resultado: no.valor };
         }
         return { tipo: t, resultado: no.valor };
@@ -48,7 +48,7 @@ function processarExpressao(no) {
 
     // Verificação Estrita de Tipos (Exigência do professor: tipos devem ser iguais) [cite: 66, 171]
     if (esq.tipo !== dir.tipo) {
-        erros.push("❌ Erro de tipo: Operação inválida entre " + esq.tipo + " e " + dir.tipo);
+        erros.push(" Erro de tipo: Operação inválida entre " + esq.tipo + " e " + dir.tipo);
         return { tipo: null, resultado: null };
     }
 
@@ -125,13 +125,13 @@ programa
     : diretivas comandos EOF
     {
         console.log("\n==================================================");
-        console.log("✅ Análise Sintática e Semântica Concluída!");
+        console.log("Análise Sintática e Semântica Concluída!");
         console.log("==================================================");
         
-        console.log("\n📜 Tabela de Símbolos Final:");
+        console.log("\n Tabela de Símbolos Final:");
         console.table(tabelaSimbolos);
 
-        console.log("\n⚙️ Código de Três Endereços (TAC) Gerado:");
+        console.log("\n Código de Três Endereços (TAC) Gerado:");
         if (tac.length > 0) {
             tac.forEach(linha => console.log("   " + linha));
         } else {
@@ -139,10 +139,10 @@ programa
         }
 
         if (erros.length > 0) {
-            console.log("\n⚠️ Erros Semânticos Detectados:");
+            console.log("\n Erros Semânticos Detectados:");
             erros.forEach(err => console.log("   " + err));
         } else {
-            console.log("\n💯 Sucesso Semântico: 0 erros detectados!");
+            console.log("\n Sucesso Semântico: 0 erros detectados!");
         }
     }
     | diretivas EOF
@@ -154,8 +154,8 @@ diretivas
     ;
 
 diretiva
-    : INCLUDE   { console.log("🔹 Encontrou #include"); }
-    | DEFINE    { console.log("🔹 Encontrou #define"); }
+    : INCLUDE   { console.log(" Encontrou #include"); }
+    | DEFINE    { console.log(" Encontrou #define"); }
     ;
 
 comandos
@@ -176,20 +176,20 @@ declaracao
     : tipo ID ';'
     {
         if (tabelaSimbolos[$2]) {
-            erros.push("❌ Erro: Variável '" + $2 + "' já declarada neste programa.");
+            erros.push(" Erro: Variável '" + $2 + "' já declarada neste programa.");
         } else {
             // Guarda o tipo e o escopo atual na tabela [cite: 45, 63]
             tabelaSimbolos[$2] = { tipo: $1, escopo: escopoAtual };
-            console.log("🟢 Declaração simples: " + $2 + " | Tipo: " + $1);
+            console.log(" Declaração simples: " + $2 + " | Tipo: " + $1);
         }
     }
     | tipo ID '=' expressao ';'
     {
         if (tabelaSimbolos[$2]) {
-            erros.push("❌ Erro: Variável '" + $2 + "' já declarada neste programa.");
+            erros.push(" Erro: Variável '" + $2 + "' já declarada neste programa.");
         } else {
             tabelaSimbolos[$2] = { tipo: $1, escopo: escopoAtual };
-            console.log("🟢 Declaração com Inicialização: " + $2);
+            console.log(" Declaração com Inicialização: " + $2);
 
             // Processa a árvore gerada à direita 
             let resExpressao = processarExpressao($4);
@@ -197,7 +197,7 @@ declaracao
             if (resExpressao && resExpressao.tipo) {
                 // Valida se o tipo da expressão casa com o tipo da variável declarada [cite: 66]
                 if ($1 !== resExpressao.tipo) {
-                    erros.push("❌ Erro de Tipo: Não é possível inicializar '" + $1 + "' com uma expressão do tipo '" + resExpressao.tipo + "'");
+                    erros.push(" Erro de Tipo: Não é possível inicializar '" + $1 + "' com uma expressão do tipo '" + resExpressao.tipo + "'");
                 } else {
                     // Tipos válidos: gera a instrução final de atribuição no TAC [cite: 29, 33]
                     tac.push($2 + " = " + resExpressao.resultado);
@@ -213,7 +213,7 @@ atribuicao
         let tipoVariavel = buscarTipo($1);
 
         if (!tipoVariavel) {
-            erros.push("❌ Erro Semântico: Variável não declarada -> " + $1);
+            erros.push(" Erro Semântico: Variável não declarada -> " + $1);
         } else {
             // Avalia e valida a subárvore sintática da expressão [cite: 13, 84]
             let resExpressao = processarExpressao($3);
@@ -221,11 +221,11 @@ atribuicao
             if (resExpressao && resExpressao.tipo) {
                 // Impede atribuições entre tipos diferentes (ex: int recebendo float) [cite: 66, 171]
                 if (tipoVariavel !== resExpressao.tipo) {
-                    erros.push("❌ Erro de Atribuição: Incompatibilidade de tipos. Não é possível atribuir '" + resExpressao.tipo + "' a uma variável '" + tipoVariavel + "' (" + $1 + ")");
+                    erros.push(" Erro de Atribuição: Incompatibilidade de tipos. Não é possível atribuir '" + resExpressao.tipo + "' a uma variável '" + tipoVariavel + "' (" + $1 + ")");
                 } else {
                     // Sucesso: adiciona o comando final ao Código de Três Endereços [cite: 33, 77]
                     tac.push($1 + " = " + resExpressao.resultado);
-                    console.log("🟡 Atribuição processada para: " + $1);
+                    console.log(" Atribuição processada para: " + $1);
                 }
             }
         }
@@ -234,24 +234,24 @@ atribuicao
 
 if_stmt
     : IF '(' expressao ')' comando %prec LOWER_THAN_ELSE
-        { console.log("🔵 Processou comando IF"); }
+        { console.log(" Processou comando IF"); }
     | IF '(' expressao ')' comando ELSE comando
-        { console.log("🔵 Processou comando IF-ELSE"); }
+        { console.log(" Processou comando IF-ELSE"); }
     ;
 
 while_stmt
     : WHILE '(' expressao ')' comando
-        { console.log("🟣 Processou comando WHILE"); }
+        { console.log(" Processou comando WHILE"); }
     ;
 
 for_stmt
     : FOR '(' ID '=' expressao ';' expressao ';' expressao ')' comando
-        { console.log("🟠 Processou comando FOR"); }
+        { console.log(" Processou comando FOR"); }
     ;
 
 bloco
     : '{' comandos '}'
-        { console.log("📦 Fechou Bloco de Código"); }
+        { console.log(" Fechou Bloco de Código"); }
     ;
 
 tipo
