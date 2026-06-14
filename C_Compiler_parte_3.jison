@@ -1,20 +1,17 @@
-
 %{
 /* ==========================================================================
-   SEMÂNTICA & CÓDIGO INTERMEDIÁRIO (PARTE 3)
+   SEMÂNTICA & CÓDIGO INTERMEDIÁRIO (PARTE 3) - VERSÃO COM SUPORTE A FUNÇÕES
    ========================================================================== */
 var escopoAtual = 0;
-var tabelaSimbolos = {}; // Objeto para busca direta de variáveis e seus tipos [cite: 37, 38]
-var tac = [];            // Armazena as instruções do Three Address Code [cite: 33]
-var erros = [];          // Armazena erros semânticos de tipo ou escopo [cite: 172]
-var tempCont = 0;        // Contador para geração de variáveis temporárias (T1, T2...)
+var tabelaSimbolos = {}; 
+var tac = [];            
+var erros = [];          
+var tempCont = 0;        
 
-// Fábrica de nós para construir a Árvore Sintática Abstrata (AST) [cite: 2, 4]
 function criarNo(tipo, valor, esquerda = null, direita = null) {
     return { tipo: tipo, valor: valor, esquerda: esquerda, direita: direita };
 }
 
-// Busca o tipo de uma variável na tabela de símbolos [cite: 63]
 function buscarTipo(id) {
     if (tabelaSimbolos[id]) {
         return tabelaSimbolos[id].tipo;
@@ -22,15 +19,12 @@ function buscarTipo(id) {
     return null;
 }
 
-// Percorre a AST de baixo para cima (Pós-Ordem) para validar tipos e gerar TAC 
 function processarExpressao(no) {
     if (!no) return null;
 
-    // Nós folhas: Valores literais [cite: 8]
     if (no.tipo === 'NUM') return { tipo: 'int', resultado: no.valor };
     if (no.tipo === 'FLOAT') return { tipo: 'float', resultado: no.valor };
     
-    // Nó folha: Identificador (Variável) [cite: 8]
     if (no.tipo === 'ID') {
         let t = buscarTipo(no.valor);
         if (!t) {
@@ -40,26 +34,21 @@ function processarExpressao(no) {
         return { tipo: t, resultado: no.valor };
     }
 
-    // Processa recursivamente os filhos da esquerda e da direita [cite: 84, 97]
     let esq = processarExpressao(no.esquerda);
     let dir = processarExpressao(no.direita);
 
     if (!esq || !dir || !esq.tipo || !dir.tipo) return { tipo: null, resultado: null };
 
-    // Verificação Estrita de Tipos (Exigência do professor: tipos devem ser iguais) [cite: 66, 171]
     if (esq.tipo !== dir.tipo) {
         erros.push(" Erro de tipo: Operação inválida entre " + esq.tipo + " e " + dir.tipo);
         return { tipo: null, resultado: null };
     }
 
-    // Criação de variáveis temporárias para o Código de Três Endereços [cite: 33]
     tempCont++;
     let novoTemp = "T" + tempCont;
     
-    // Adiciona a instrução aritmética ao TAC. Ex: T1 = A + B [cite: 33, 85]
     tac.push(novoTemp + " = " + esq.resultado + " " + no.valor + " " + dir.resultado);
 
-    // Retorna o tipo resultante e onde o valor está armazenado temporariamente [cite: 92]
     return { tipo: esq.tipo, resultado: novoTemp };
 }
 %}
@@ -67,46 +56,51 @@ function processarExpressao(no) {
 %lex
 %%
 
-\s+                     /* ignora espaços */
+\s+                     /* ignora espaços e quebras de linha */
 "//".* /* ignora comentários de linha */
-\/\*[^*]*\*+([^/*][^*]*\*+)*\/ /* ignora comentários de bloco */
-\n                      /* ignora quebra de linha */
+"/*"([^*]|\*+[^*/])*\*+"/" /* ignora comentários de bloco */
 
-\#include[^\n]* return 'INCLUDE';
-\#define[^\n]* return 'DEFINE';
+/* Diretivas de pré-processador */
+\#include[ \t]*\<[^>\n]+\>           return 'INCLUDE';
+\#include[ \t]*\"[^"\n]+\"           return 'INCLUDE';
+\#define[ \t]+[a-zA-Z_][a-zA-Z0-9_]* return 'DEFINE';
 
-"if"        return 'IF';
-"else"      return 'ELSE';
-"while"     return 'WHILE';
-"for"       return 'FOR';
+"if"                    return 'IF';
+"else"                  return 'ELSE';
+"while"                 return 'WHILE';
+"for"                   return 'FOR';
 
-"int"       return 'INT_TYPE';
-"float"     return 'FLOAT_TYPE';
-"char"      return 'CHAR_TYPE';
+"int"                   return 'INT_TYPE';
+"float"                 return 'FLOAT_TYPE';
+"char"                  return 'CHAR_TYPE';
 
-"="         return '=';
-"<"         return '<';
-">"         return '>';
-"+"         return '+';
-"-"         return '-';
-"*"         return '*';
-"/"         return '/';
+"=="                    return 'COMP_OP';
+"!="                    return 'COMP_OP';
+"<="                    return 'COMP_OP';
+">="                    return 'COMP_OP';
+"="                     return '=';
+"<"                     return '<';
+">"                     return '>';
+"+"                     return '+';
+"-"                     return '-';
+"*"                     return '*';
+"/"                     return '/';
 
-"("         return '(';
-")"         return ')';
-"{"         { escopoAtual++; return '{'; } /* Incrementa nível de escopo ao abrir bloco [cite: 60] */
-"}"         { escopoAtual--; return '}'; } /* Decrementa nível de escopo ao fechar bloco [cite: 60] */
-";"         return ';';
-","         return ',';
+"("                     return '(';
+")"                     return ')';
+"{"                     { escopoAtual++; return '{'; } 
+"}"                     { escopoAtual--; return '}'; } 
+";"                     return ';';
+","                     return ',';
 
-[0-9]+\.[0-9]+      { yytext = Number(yytext); return 'FLOAT'; }
-[0-9]+              { yytext = Number(yytext); return 'NUM'; }
+[0-9]+\.[0-9]+          { yytext = Number(yytext); return 'FLOAT'; }
+[0-9]+                  { yytext = Number(yytext); return 'NUM'; }
 
 [a-zA-Z_][a-zA-Z0-9_]* return 'ID';
 
-.   { throw new Error("Caractere inválido: " + yytext); }
+.                       { throw new Error("Caractere inválido: " + yytext); }
 
-<<EOF>>             return 'EOF';
+<<EOF>>                 return 'EOF';
 
 /lex
 
@@ -115,7 +109,7 @@ function processarExpressao(no) {
 /* Definição de Precedência de Operadores */
 %left '+' '-'
 %left '*' '/'
-%left '<' '>'
+%left '<' '>' 'COMP_OP'
 %nonassoc LOWER_THAN_ELSE
 %nonassoc ELSE
 
@@ -124,6 +118,8 @@ function processarExpressao(no) {
 programa
     : diretivas comandos EOF
     {
+        $$ = { tipoNode: 'PROGRAMA', diretivas: $1, comandos: $2 };
+
         console.log("\n==================================================");
         console.log("Análise Sintática e Semântica Concluída!");
         console.log("==================================================");
@@ -144,62 +140,82 @@ programa
         } else {
             console.log("\n Sucesso Semântico: 0 erros detectados!");
         }
+
+        return $$; 
     }
     | diretivas EOF
+    { 
+        $$ = { tipoNode: 'PROGRAMA', diretivas: $1, comandos: [] };
+        return $$;
+    }
     ;
 
 diretivas
-    : diretivas diretiva
-    | /* vazio */
+    : diretivas diretiva    { $$ = $1.concat([$2]); }
+    | /* vazio */           { $$ = []; }
     ;
 
 diretiva
-    : INCLUDE   { console.log(" Encontrou #include"); }
-    | DEFINE    { console.log(" Encontrou #define"); }
+    : INCLUDE   { $$ = { tipoNode: 'INCLUDE', valor: yytext }; }
+    | DEFINE    { $$ = { tipoNode: 'DEFINE', valor: yytext }; }
     ;
 
 comandos
-    : comandos comando
-    | comando
+    : comandos comando      { $$ = $1.concat([$2]); }
+    | comando               { $$ = [$1]; }
     ;
 
 comando
-    : declaracao
-    | atribuicao
-    | if_stmt
-    | while_stmt
-    | for_stmt
-    | bloco
+    : funcao            { $$ = $1; }
+    | declaracao        { $$ = $1; }
+    | atribuicao        { $$ = $1; }
+    | if_stmt           { $$ = $1; }
+    | while_stmt        { $$ = $1; }
+    | for_stmt          { $$ = $1; }
+    | bloco             { $$ = $1; }
+    ;
+
+/* Suporte para assinaturas de função como int main() */
+funcao
+    : tipo ID '(' ')' bloco
+    {
+        $$ = { tipoNode: 'FUNCAO', retorno: $1, nome: $2, corpo: $5 };
+        console.log(" Encontrou declaração de função: " + $2);
+    }
     ;
 
 declaracao
     : tipo ID ';'
     {
+        $$ = { tipoNode: 'DECLARACAO_SIMPLES', tipo: $1, id: $2 };
         if (tabelaSimbolos[$2]) {
-            erros.push(" Erro: Variável '" + $2 + "' já declarada neste programa.");
+            erros.push(" Erro: Variável '" + $2 + "' já declarada.");
         } else {
-            // Guarda o tipo e o escopo atual na tabela [cite: 45, 63]
             tabelaSimbolos[$2] = { tipo: $1, escopo: escopoAtual };
-            console.log(" Declaração simples: " + $2 + " | Tipo: " + $1);
+        }
+    }
+    /* Suporte para ponteiros simples como: int *arr; */
+    | tipo '*' ID ';'
+    {
+        $$ = { tipoNode: 'DECLARACAO_PONTEIRO', tipo: $1 + '*', id: $3 };
+        if (tabelaSimbolos[$3]) {
+            erros.push(" Erro: Variável '" + $3 + "' já declarada.");
+        } else {
+            tabelaSimbolos[$3] = { tipo: $1 + '*', escopo: escopoAtual };
         }
     }
     | tipo ID '=' expressao ';'
     {
+        $$ = { tipoNode: 'DECLARACAO_INICIALIZADA', tipo: $1, id: $2, expressao: $4 };
         if (tabelaSimbolos[$2]) {
-            erros.push(" Erro: Variável '" + $2 + "' já declarada neste programa.");
+            erros.push(" Erro: Variável '" + $2 + "' já declarada.");
         } else {
             tabelaSimbolos[$2] = { tipo: $1, escopo: escopoAtual };
-            console.log(" Declaração com Inicialização: " + $2);
-
-            // Processa a árvore gerada à direita 
             let resExpressao = processarExpressao($4);
-
             if (resExpressao && resExpressao.tipo) {
-                // Valida se o tipo da expressão casa com o tipo da variável declarada [cite: 66]
                 if ($1 !== resExpressao.tipo) {
-                    erros.push(" Erro de Tipo: Não é possível inicializar '" + $1 + "' com uma expressão do tipo '" + resExpressao.tipo + "'");
+                    erros.push(" Erro de Tipo: Não é possível inicializar '" + $1 + "' com '" + resExpressao.tipo + "'");
                 } else {
-                    // Tipos válidos: gera a instrução final de atribuição no TAC [cite: 29, 33]
                     tac.push($2 + " = " + resExpressao.resultado);
                 }
             }
@@ -210,22 +226,17 @@ declaracao
 atribuicao
     : ID '=' expressao ';'
     {
+        $$ = { tipoNode: 'ATRIBUICAO', id: $1, expressao: $3 };
         let tipoVariavel = buscarTipo($1);
-
         if (!tipoVariavel) {
             erros.push(" Erro Semântico: Variável não declarada -> " + $1);
         } else {
-            // Avalia e valida a subárvore sintática da expressão [cite: 13, 84]
             let resExpressao = processarExpressao($3);
-
             if (resExpressao && resExpressao.tipo) {
-                // Impede atribuições entre tipos diferentes (ex: int recebendo float) [cite: 66, 171]
                 if (tipoVariavel !== resExpressao.tipo) {
-                    erros.push(" Erro de Atribuição: Incompatibilidade de tipos. Não é possível atribuir '" + resExpressao.tipo + "' a uma variável '" + tipoVariavel + "' (" + $1 + ")");
+                    erros.push(" Erro de Atribuição: Incompatibilidade de tipos em " + $1);
                 } else {
-                    // Sucesso: adiciona o comando final ao Código de Três Endereços [cite: 33, 77]
                     tac.push($1 + " = " + resExpressao.resultado);
-                    console.log(" Atribuição processada para: " + $1);
                 }
             }
         }
@@ -234,24 +245,32 @@ atribuicao
 
 if_stmt
     : IF '(' expressao ')' comando %prec LOWER_THAN_ELSE
-        { console.log(" Processou comando IF"); }
+        { $$ = { tipoNode: 'IF', condicao: $3, corpoIf: $5 }; }
     | IF '(' expressao ')' comando ELSE comando
-        { console.log(" Processou comando IF-ELSE"); }
+        { $$ = { tipoNode: 'IF_ELSE', condicao: $3, corpoIf: $5, corpoElse: $7 }; }
     ;
 
 while_stmt
     : WHILE '(' expressao ')' comando
-        { console.log(" Processou comando WHILE"); }
+        { $$ = { tipoNode: 'WHILE', condicao: $3, corpo: $5 }; }
     ;
 
 for_stmt
     : FOR '(' ID '=' expressao ';' expressao ';' expressao ')' comando
-        { console.log(" Processou comando FOR"); }
+        { 
+            $$ = { 
+                tipoNode: 'FOR', 
+                inicializacao: { tipoNode: 'ATRIBUICAO_FOR', id: $3, expressao: $5 }, 
+                condicao: $7, 
+                incremento: $9, 
+                corpo: $11 
+            }; 
+        }
     ;
 
 bloco
     : '{' comandos '}'
-        { console.log(" Fechou Bloco de Código"); }
+        { $$ = { tipoNode: 'BLOCO_CODIGO', comandos: $2 }; }
     ;
 
 tipo
@@ -260,16 +279,16 @@ tipo
     | CHAR_TYPE    { $$ = 'char'; }
     ;
 
-/* EXPRESSÕES: CONSTRUÇÃO DA AST (BOTTOM-UP) [cite: 5, 6] */
 expressao
-    : expressao '+' expressao   { $$ = criarNo('OP', '+', $1, $3); }  /* Nó de Operação [cite: 7, 14] */
+    : expressao '+' expressao   { $$ = criarNo('OP', '+', $1, $3); }
     | expressao '-' expressao   { $$ = criarNo('OP', '-', $1, $3); }
     | expressao '*' expressao   { $$ = criarNo('OP', '*', $1, $3); }
     | expressao '/' expressao   { $$ = criarNo('OP', '/', $1, $3); }
     | expressao '>' expressao   { $$ = criarNo('OP', '>', $1, $3); }
     | expressao '<' expressao   { $$ = criarNo('OP', '<', $1, $3); }
+    | expressao COMP_OP expressao { $$ = criarNo('OP', $2, $1, $3); }
     | '(' expressao ')'         { $$ = $2; }
-    | NUM                       { $$ = criarNo('NUM', $1); }          /* Nós Folhas Literais [cite: 8] */
+    | NUM                       { $$ = criarNo('NUM', $1); }
     | FLOAT                     { $$ = criarNo('FLOAT', $1); }
-    | ID                        { $$ = criarNo('ID', $1); }           /* Nó Folha Identificador [cite: 8] */
+    | ID                        { $$ = criarNo('ID', $1); }
     ;
