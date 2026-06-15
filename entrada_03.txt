@@ -43,9 +43,9 @@
         }
 
 	int flag2 = 10;
-	sum = flag2 + even_count + 3 * odd_count / 4.5 - odd_count  * 2                   // erro pois 4.5 eh float e os demais int
-	sum = flag2 + even_count + 3 * odd_count / 45 - soma3                            // erro escopo diferente
-	sum = flag2 + even_count + 23 + flag2 * 30 + 3 * odd_count / 45 - odd_count * 34 // OK tudo int
+	sum = flag2 + even_count + 3 * odd_count / 4.5 - odd_count  * 2;                   // erro pois 4.5 eh float e os demais int
+	sum = flag2 + even_count + 3 * odd_count / 45 - soma3;                            // erro escopo diferente
+	sum = flag2 + even_count + 23 + flag2 * 30 + 3 * odd_count / 45 - odd_count * 34; // OK tudo int
     }
 
     average = (float)sum / SIZE; // Calculando média como float
