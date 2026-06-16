@@ -1,12 +1,12 @@
-/* >>> Gramática Unificada e Corrigida - parte_3_Final.jison <<< */
+
 
 %{
     var escopoAtual = 0;
     var tabelaSimbolos = [];
     var tac = [];
     var erros = [];
+    var tipoAtual = ''; // Conforme seção 4 do PDF (Verificação de Escopo e Tipo)
 
-    // Função de criação de variáveis corrigida e funcional
     function criarVariavel(tipo, nome, valor, escopo) {
         var existe = tabelaSimbolos.some(function(s) {
             return s.id === nome && s.escopo === escopo;
@@ -17,7 +17,6 @@
         }
     }
 
-    // Função para simular a geração de código de 3 endereços (TAC) que faltava
     function gerarCod(resultado, op1, operador, op2) {
         var linha = resultado + " = " + op1 + " " + operador + " " + op2;
         tac.push(linha);
@@ -48,7 +47,7 @@
 "if"                                return 'IF';
 "else"                              return 'ELSE';
 "while"                             return 'WHILE';
-"do"                                return 'DO';
+"do"                                return 'DO_WHILE'; /* Ajustado conforme a tabela de tokens do PDF */
 "for"                               return 'FOR';
 "switch"                            return 'SWITCH';
 "case"                              return 'CASE';
@@ -115,7 +114,7 @@
 
 %%
 
-/* >>> Gramática BNF Corrigida e Expandida <<< */
+/* >>> Gramática BNF <<< */
 
 expressions
     : elementos EOF
@@ -184,7 +183,7 @@ comando_estruturado
     : IF '(' condicao ')' comando %prec IF
     | IF '(' condicao ')' comando ELSE comando
     | WHILE '(' condicao ')' comando
-    | DO comando WHILE '(' condicao ')' ';'
+    | DO_WHILE comando WHILE '(' condicao ')' ';'
     | FOR '(' atribuicao_for ';' condicao_opt ';' atribuicao_for ')' comando
     | SWITCH '(' expr ')' '{' casos '}'
     ;
@@ -212,10 +211,10 @@ declaracao
     ;
 
 tipo_basico
-    : INT    { $$ = 'int'; }
-    | FLOAT  { $$ = 'float'; }
-    | DOUBLE { $$ = 'double'; }
-    | CHAR   { $$ = 'char'; }
+    : INT    { tipoAtual = 'int'; $$ = 'int'; }
+    | FLOAT  { tipoAtual = 'float'; $$ = 'float'; }
+    | DOUBLE { tipoAtual = 'double'; $$ = 'double'; }
+    | CHAR   { tipoAtual = 'char'; $$ = 'char'; }
     ;
 
 vars
@@ -225,13 +224,13 @@ vars
 
 var_item
     : IDF '=' expr
-        { criarVariavel(tipoBasico, $1, $3, escopoAtual); }
+        { criarVariavel(tipoAtual, $1, $3, escopoAtual); }
     | IDF '[' expr ']' '=' '{' lista_valores '}'
-        { criarVariavel(tipoBasico + '[]', $1, 'array', escopoAtual); }
+        { criarVariavel(tipoAtual + '[]', $1, 'array', escopoAtual); }
     | IDF '[' expr ']'
-        { criarVariavel(tipoBasico + '[]', $1, 'array', escopoAtual); }
+        { criarVariavel(tipoAtual + '[]', $1, 'array', escopoAtual); }
     | IDF
-        { criarVariavel(tipoBasico, $1, undefined, escopoAtual); }
+        { criarVariavel(tipoAtual, $1, undefined, escopoAtual); }
     ;
 
 lista_valores
@@ -265,15 +264,15 @@ meio_comp
     ;
 
 expr
-    : expr '+' termo_mat      { gerarCod("t"+tac.length, $1, "+", $3); $$ = "t"+(tac.length-1); }
-    | expr '-' termo_mat      { gerarCod("t"+tac.length, $1, "-", $3); $$ = "t"+(tac.length-1); }
+    : expr '+' termo_mat      { var temp = "t"+tac.length; gerarCod(temp, $1, "+", $3); $$ = temp; }
+    | expr '-' termo_mat      { var temp = "t"+tac.length; gerarCod(temp, $1, "-", $3); $$ = temp; }
     | termo_mat               { $$ = $1; }
     ;
 
 termo_mat
-    : termo_mat '*' fator_mat { gerarCod("t"+tac.length, $1, "*", $3); $$ = "t"+(tac.length-1); }
-    | termo_mat '/' fator_mat { gerarCod("t"+tac.length, $1, "/", $3); $$ = "t"+(tac.length-1); }
-    | termo_mat '%' fator_mat { gerarCod("t"+tac.length, $1, "%", $3); $$ = "t"+(tac.length-1); }
+    : termo_mat '*' fator_mat { var temp = "t"+tac.length; gerarCod(temp, $1, "*", $3); $$ = temp; }
+    | termo_mat '/' fator_mat { var temp = "t"+tac.length; gerarCod(temp, $1, "/", $3); $$ = temp; }
+    | termo_mat '%' fator_mat { var temp = "t"+tac.length; gerarCod(temp, $1, "%", $3); $$ = temp; }
     | fator_mat               { $$ = $1; }
     ;
 
