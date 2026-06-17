@@ -121,9 +121,6 @@
 
 %%
 
-/* >>> Gramática BNF <<< */
-
-%%
 
 /* >>> Gramática BNF <<< */
 
