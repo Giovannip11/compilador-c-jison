@@ -29,7 +29,7 @@
 
 \s+                                 /* ignorar brancos */
 "//".* /* ignorar comentários de linha */
-"/*"([^*]|\*+[^*/])*?\*+"/"         /* ignorar comentários de bloco */
+"/*"([^*]|\*+[^*/])*\*+"/"   /* ignore */
 
 /* Diretivas de Pré-processamento */
 "#include"[ \t]+"<"[^>\n]+">"        return 'INCLUDE';
@@ -53,11 +53,16 @@
 "case"                              return 'CASE';
 "break"                             return 'BREAK';
 "default"                           return 'DEFAULT';
+"return"                            return 'RETURN';
+"void"                              return 'VOID';
 
 /* Operadores Expandidos do C */
 "++"                                return 'INCREMENTO';
 "+="                                return 'MAIS_IGUAL';
 "-="                                return 'MENOS_IGUAL';
+"--"                                return 'DECREMENTO';
+"sizeof"                            return 'SIZEOF';
+"&"                                 return '&';
 
 /* Operadores Relacionais e Lógicos */
 "<="                                return 'LE';
@@ -67,6 +72,8 @@
 "||"                                return 'OR';
 "&&"                                return 'AND';
 "!"                                 return 'NOT';
+"NULL"                              return 'NULL';
+\"([^\\\"]|\\.)*\"                  return 'STRING_LIT';
 
 /* Símbolos e Pontuação */
 "<"                                 return '<';
@@ -150,7 +157,16 @@ funcao
     : tipo_basico IDF '(' parametros_opt ')' bloco
     | IDF '(' parametros_opt ')' bloco
     ;
-
+argumentos_opt
+    : { $$ = [];}
+    | argumentos { $$ = $1;}
+    ;
+argumentos
+    : expr 
+        { $$ = [$1]; }
+    | expr ',' argumentos 
+        { $$ = [$1].concat($3);}
+    ;
 parametros_opt
     : lista_parametros
     | /* vazio */
@@ -173,10 +189,16 @@ comandos
 comando
     : declaracao ';'
     | atribuicao ';'
+    | chamada_funcao ';'
     | comando_estruturado
     | bloco
     | BREAK ';'
+    | RETURN expr ';'
+    | RETURN ';'
     | ';'
+    ;
+chamada_funcao
+    : IDF '(' argumentos_opt ')'
     ;
 
 comando_estruturado
@@ -197,6 +219,7 @@ casos
 
 atribuicao_for
     : atribuicao
+    | declaracao
     | expr
     | /* vazio */
     ;
@@ -215,6 +238,7 @@ tipo_basico
     | FLOAT  { tipoAtual = 'float'; $$ = 'float'; }
     | DOUBLE { tipoAtual = 'double'; $$ = 'double'; }
     | CHAR   { tipoAtual = 'char'; $$ = 'char'; }
+    | VOID   { tipoAtual = 'void'; $$ = 'void'; }
     ;
 
 vars
@@ -223,14 +247,53 @@ vars
     ;
 
 var_item
-    : IDF '=' expr
-        { criarVariavel(tipoAtual, $1, $3, escopoAtual); }
+    : '*' IDF
+        {
+            criarVariavel(tipoAtual + '*',
+                           $2,
+                           undefined,
+                           escopoAtual);
+        }
+
+    | '*' IDF '=' expr
+        {
+            criarVariavel(tipoAtual + '*',
+                           $2,
+                           $4,
+                           escopoAtual);
+        }
+
+    | IDF '=' expr
+        {
+            criarVariavel(tipoAtual,
+                           $1,
+                           $3,
+                           escopoAtual);
+        }
+
     | IDF '[' expr ']' '=' '{' lista_valores '}'
-        { criarVariavel(tipoAtual + '[]', $1, 'array', escopoAtual); }
+        {
+            criarVariavel(tipoAtual + '[]',
+                           $1,
+                           'array',
+                           escopoAtual);
+        }
+
     | IDF '[' expr ']'
-        { criarVariavel(tipoAtual + '[]', $1, 'array', escopoAtual); }
+        {
+            criarVariavel(tipoAtual + '[]',
+                           $1,
+                           'array',
+                           escopoAtual);
+        }
+
     | IDF
-        { criarVariavel(tipoAtual, $1, undefined, escopoAtual); }
+        {
+            criarVariavel(tipoAtual,
+                           $1,
+                           undefined,
+                           escopoAtual);
+        }
     ;
 
 lista_valores
@@ -243,6 +306,7 @@ atribuicao
     | IDF MAIS_IGUAL expr
     | IDF MENOS_IGUAL expr
     | IDF INCREMENTO
+    | IDF DECREMENTO
     | IDF '[' expr ']' '=' expr
     ;
 
@@ -277,12 +341,46 @@ termo_mat
     ;
 
 fator_mat
-    : '(' expr ')'            { $$ = $2; }
-    | '(' tipo_basico ')' fator_mat %prec CAST { $$ = $4; }
-    | IDF '[' expr ']'        { $$ = $1 + "[]"; }
-    | IDF                     { $$ = $1; }
-    | IDF INCREMENTO          { $$ = $1; }
-    | INT_LIT                 { $$ = $1; }
-    | F_LIT                   { $$ = $1; }
-    | CHAR_LIT                { $$ = $1; }
+    : '(' expr ')'
+        { $$ = $2; }
+
+    | '(' tipo_basico ')' fator_mat %prec CAST
+        { $$ = $4; }
+
+    | '(' tipo_basico '*' ')' fator_mat %prec CAST
+        { $$ = $5; }
+
+    | chamada_funcao
+        { $$ = 'call'; }
+
+    | IDF '[' expr ']'
+        { $$ = $1 + "[]"; }
+
+    | IDF
+        { $$ = $1; }
+
+    | '&' IDF
+        { $$ = "&" + $2; }
+
+    | IDF INCREMENTO
+        { $$ = $1; }
+
+    | IDF DECREMENTO
+        { $$ = $1; }
+
+    | INT_LIT
+        { $$ = $1; }
+    | STRING_LIT
+        { $$ = $1; }
+
+    | F_LIT
+        { $$ = $1; }
+
+    | CHAR_LIT
+        { $$ = $1; }
+    | SIZEOF '(' tipo_basico ')'
+        { $$ = 'sizeof(' + $3 + ')'; }
+
+    | NULL
+        { $$ = 'NULL'; }
     ;
