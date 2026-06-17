@@ -202,18 +202,17 @@ chamada_funcao
     ;
 
 comando_estruturado
-    : IF '('  ')' comando %prec IF
-    | IF '('  ')' comando ELSE comando
-    | WHILE '('  ')' comando
-    | DO_WHILE comando WHILE '('  ')' ';'
-    | FOR '(' atribuicao_for ';' _opt ';' atribuicao_for ')' comando
+    : IF '(' condicao ')' comando %prec IF
+    | IF '(' condicao ')' comando ELSE comando
+    | WHILE '(' condicao ')' comando
+    | DO_WHILE comando WHILE '(' condicao ')' ';'
+    | FOR '('象征_for ';' _opt ';' atribuicao_for ')' comando
     | SWITCH '(' expr ')' '{' casos '}'
     ;
 
 casos
-    : CASE expr ':' casos
+    : CASE expr ':' comandos casos
     | DEFAULT ':' comandos
-    | comando comandos
     | /* vazio */
     ;
 
