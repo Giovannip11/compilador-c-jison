@@ -5,16 +5,37 @@
     var tabelaSimbolos = [];
     var tac = [];
     var erros = [];
-    var tipoAtual = ''; // Conforme seção 4 do PDF (Verificação de Escopo e Tipo)
+    var tipoAtual = ''; 
+
+    // Contadores exigidos pelo PDF para geração de IDs internos
+    var nInt = 0;
+    var nFloat = 0;
 
     function criarVariavel(tipo, nome, valor, escopo) {
+        // Verificação de Escopo (Seção 4 do PDF): Evita duplicidade no mesmo escopo
         var existe = tabelaSimbolos.some(function(s) {
-            return s.id === nome && s.escopo === escopo;
+            return s.nomeReal === nome && s.escopo === escopo;
         });
-        if (!existe) {
-            tabelaSimbolos.push({ tipo: tipo, id: nome, val: valor, escopo: escopo });
-            console.log('Variável criada: ' + nome + ' (' + tipo + ') no escopo ' + escopo);
+
+        if (existe) {
+            erros.push("Erro Semântico: Variável '" + nome + "' já declarada no escopo " + escopo);
+            return;
         }
+
+        // Lógica estrita do PDF: Convertendo nome para ID interno (@i0, @f0...)
+        var prefixo = (tipo && tipo[0] === 'f') ? 'f' : 'i';
+        var num = (prefixo === 'f') ? nFloat++ : nInt++;
+        var idInterno = "@" + prefixo + num;
+
+        tabelaSimbolos.push({ 
+            tipo: tipo, 
+            nomeReal: nome,      // Guarda o nome digitado
+            id: idInterno,       // O identificador interno exigido pelo PDF
+            val: valor, 
+            escopo: escopo 
+        });
+        
+        console.log('Variável criada: ' + nome + ' convertida para ' + idInterno + ' (' + tipo + ') no escopo ' + escopo);
     }
 
     function gerarCod(resultado, op1, operador, op2) {
@@ -207,16 +228,19 @@ condicao_opt
     ;
 
 declaracao
-    : tipo_basico vars
+    : capturar_tipo vars
+    ;
+
+capturar_tipo
+    : tipo_basico { tipoAtual = $1; }
     ;
 
 tipo_basico
-    : INT    { tipoAtual = 'int'; $$ = 'int'; }
-    | FLOAT  { tipoAtual = 'float'; $$ = 'float'; }
-    | DOUBLE { tipoAtual = 'double'; $$ = 'double'; }
-    | CHAR   { tipoAtual = 'char'; $$ = 'char'; }
+    : INT    { $$ = 'int'; }
+    | FLOAT  { $$ = 'float'; }
+    | DOUBLE { $$ = 'double'; }
+    | CHAR   { $$ = 'char'; }
     ;
-
 vars
     : var_item ',' vars
     | var_item
