@@ -23,8 +23,9 @@
         for (j = 0; j < array[i]; j++) {
             // Suponha que estamos fazendo alguma operação aqui, incrementa flag
             flag++;
-	    while(j > 1)
+	    while(j > 1){
 		float nada = 12.34;
+		}
         }
     }
 
