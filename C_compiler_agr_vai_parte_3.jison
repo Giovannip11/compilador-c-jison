@@ -62,7 +62,6 @@
 "-="                                return 'MENOS_IGUAL';
 "--"                                return 'DECREMENTO';
 "sizeof"                            return 'SIZEOF';
-"&"                                 return '&';
 
 /* Operadores Relacionais e Lógicos */
 "<="                                return 'LE';
@@ -73,6 +72,7 @@
 "&&"                                return 'AND';
 "!"                                 return 'NOT';
 "NULL"                              return 'NULL';
+"&"                                 return '&';
 \"([^\\\"]|\\.)*\"                  return 'STRING_LIT';
 
 /* Símbolos e Pontuação */
@@ -202,11 +202,11 @@ chamada_funcao
     ;
 
 comando_estruturado
-    : IF '(' condicao ')' comando %prec IF
-    | IF '(' condicao ')' comando ELSE comando
-    | WHILE '(' condicao ')' comando
-    | DO_WHILE comando WHILE '(' condicao ')' ';'
-    | FOR '(' atribuicao_for ';' condicao_opt ';' atribuicao_for ')' comando
+    : IF '('  ')' comando %prec IF
+    | IF '('  ')' comando ELSE comando
+    | WHILE '('  ')' comando
+    | DO_WHILE comando WHILE '('  ')' ';'
+    | FOR '(' atribuicao_for ';' _opt ';' atribuicao_for ')' comando
     | SWITCH '(' expr ')' '{' casos '}'
     ;
 
@@ -224,7 +224,7 @@ atribuicao_for
     | /* vazio */
     ;
 
-condicao_opt
+_opt
     : condicao
     | /* vazio */
     ;
@@ -311,10 +311,12 @@ atribuicao
     ;
 
 condicao
-    : condicao OR cond_termo
-    | condicao AND cond_termo
+    : condicao OR condicao
+    | condicao AND condicao
     | NOT condicao
-    | cond_termo
+    | expr meio_comp expr
+    | '(' condicao ')'
+    | expr
     ;
 
 cond_termo
