@@ -123,6 +123,10 @@
 
 /* >>> Gramática BNF <<< */
 
+%%
+
+/* >>> Gramática BNF <<< */
+
 expressions
     : elementos EOF
         %{  
@@ -157,16 +161,19 @@ funcao
     : tipo_basico IDF '(' parametros_opt ')' bloco
     | IDF '(' parametros_opt ')' bloco
     ;
+
 argumentos_opt
-    : { $$ = [];}
-    | argumentos { $$ = $1;}
+    : { $$ = []; }
+    | argumentos { $$ = $1; }
     ;
+
 argumentos
     : expr 
         { $$ = [$1]; }
     | expr ',' argumentos 
-        { $$ = [$1].concat($3);}
+        { $$ = [$1].concat($3); }
     ;
+
 parametros_opt
     : lista_parametros
     | /* vazio */
@@ -197,6 +204,7 @@ comando
     | RETURN ';'
     | ';'
     ;
+
 chamada_funcao
     : IDF '(' argumentos_opt ')'
     ;
@@ -206,7 +214,7 @@ comando_estruturado
     | IF '(' condicao ')' comando ELSE comando
     | WHILE '(' condicao ')' comando
     | DO_WHILE comando WHILE '(' condicao ')' ';'
-    | FOR '('象征_for ';' _opt ';' atribuicao_for ')' comando
+    | FOR '(' atribuicao_for ';' _opt ';' atribuicao_for ')' comando
     | SWITCH '(' expr ')' '{' casos '}'
     ;
 
@@ -248,50 +256,27 @@ vars
 var_item
     : '*' IDF
         {
-            criarVariavel(tipoAtual + '*',
-                           $2,
-                           undefined,
-                           escopoAtual);
+            criarVariavel(tipoAtual + '*', $2, undefined, escopoAtual);
         }
-
     | '*' IDF '=' expr
         {
-            criarVariavel(tipoAtual + '*',
-                           $2,
-                           $4,
-                           escopoAtual);
+            criarVariavel(tipoAtual + '*', $2, $4, escopoAtual);
         }
-
     | IDF '=' expr
         {
-            criarVariavel(tipoAtual,
-                           $1,
-                           $3,
-                           escopoAtual);
+            criarVariavel(tipoAtual, $1, $3, escopoAtual);
         }
-
     | IDF '[' expr ']' '=' '{' lista_valores '}'
         {
-            criarVariavel(tipoAtual + '[]',
-                           $1,
-                           'array',
-                           escopoAtual);
+            criarVariavel(tipoAtual + '[]', $1, 'array', escopoAtual);
         }
-
     | IDF '[' expr ']'
         {
-            criarVariavel(tipoAtual + '[]',
-                           $1,
-                           'array',
-                           escopoAtual);
+            criarVariavel(tipoAtual + '[]', $1, 'array', escopoAtual);
         }
-
     | IDF
         {
-            criarVariavel(tipoAtual,
-                           $1,
-                           undefined,
-                           escopoAtual);
+            criarVariavel(tipoAtual, $1, undefined, escopoAtual);
         }
     ;
 
@@ -344,44 +329,32 @@ termo_mat
 fator_mat
     : '(' expr ')'
         { $$ = $2; }
-
     | '(' tipo_basico ')' fator_mat %prec CAST
         { $$ = $4; }
-
     | '(' tipo_basico '*' ')' fator_mat %prec CAST
         { $$ = $5; }
-
     | chamada_funcao
         { $$ = 'call'; }
-
     | IDF '[' expr ']'
         { $$ = $1 + "[]"; }
-
     | IDF
         { $$ = $1; }
-
     | '&' IDF
         { $$ = "&" + $2; }
-
     | IDF INCREMENTO
         { $$ = $1; }
-
     | IDF DECREMENTO
         { $$ = $1; }
-
     | INT_LIT
         { $$ = $1; }
     | STRING_LIT
         { $$ = $1; }
-
     | F_LIT
         { $$ = $1; }
-
     | CHAR_LIT
         { $$ = $1; }
     | SIZEOF '(' tipo_basico ')'
         { $$ = 'sizeof(' + $3 + ')'; }
-
-    | NULL
+    | 'NULL'
         { $$ = 'NULL'; }
     ;
