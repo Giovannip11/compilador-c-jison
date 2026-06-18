@@ -1,195 +1,148 @@
-/* >>> Gramática Léxica e Semântica Unificada <<< */
 %{
-var escopo = 0;
-var nInt = 0;
-var nFloat = 0;
-var tabelaSimbolos = []; 
-var raiz = null;         
-var tipoAtual = "";
+    var escopoAtual = 0;
+    var tabelaSimbolos = [];
+    var tac = [];
+    var erros = [];
+    var tipoAtual = ''; 
 
-function criarSimbolo(tipo, nome) {
-    var t = 'i';
-    var n = nInt;
-    
-    if (tipo.toLowerCase().indexOf('float') !== -1 || tipo.toLowerCase().indexOf('double') !== -1) {
-        t = 'f';
-        n = nFloat++;
-    } else {
-        nInt++;
-    }
-    
-    var idGerado = "@" + t + n;
-    
-    tabelaSimbolos.push({
-        id: idGerado,
-        nome: nome,
-        tipo: tipo,
-        escopo: escopo
-    });
-}
-
-function criarNo(valor, tipoNode, esquerda = null, direita = null) {
-    return {
-        valor: valor,
-        tipo: tipoNode,
-        escopo: escopo,
-        esquerda: esquerda,
-        direita: direita,
-        proximo: null
-    };
-}
-
-function adicionarNoRaiz(novoNo) {
-    if (raiz !== null) {
-        var pos = raiz;
-        while (pos.proximo !== null) {
-            pos = pos.proximo;
-        }
-        pos.proximo = novoNo;
-    } else {
-        raiz = novoNo;
-    }
-}
-
-function printArvore(no) {
-    if (no !== null) {
-        var res = "";
-        if (no.esquerda) res += printArvore(no.esquerda) + " ";
-        res += no.valor;
-        if (no.direita) res += " " + printArvore(no.direita);
-        return res;
-    }
-    return "";
-}
-
-function printAtomos(no) {
-    if (no !== null) {
-        var esq = no.esquerda;
-        var dir = no.direita;
-        
-        if (no.tipo === 'ATT') {
-            if (dir && (dir.tipo === 'INT_LIT' || dir.tipo === 'F_LIT' || dir.tipo === 'IDF')) {
-                console.log(no.valor + " " + esq.valor + " " + dir.valor);
-            } else if (dir) {
-                printAtomos(dir);
-                console.log(no.valor + " " + esq.valor + " *");
-            }
-        } else if (no.tipo === 'OPC' || no.tipo === 'OPD') {
-            if (esq && (esq.tipo === 'INT_LIT' || esq.tipo === 'F_LIT' || esq.tipo === 'IDF')) {
-                if (dir && (dir.tipo === 'INT_LIT' || dir.tipo === 'F_LIT' || dir.tipo === 'IDF')) {
-                    console.log(no.valor + " " + esq.valor + " " + dir.valor);
-                } else if (dir) {
-                    printAtomos(dir);
-                    console.log(no.valor + " " + esq.valor + " *");
-                }
-            } else if (esq) {
-                if (dir && (dir.tipo === 'INT_LIT' || dir.tipo === 'F_LIT' || dir.tipo === 'IDF')) {
-                    printAtomos(esq);
-                    console.log(no.valor + " * " + dir.valor);
-                } else if (dir) {
-                    printAtomos(esq);
-                    printAtomos(dir);
-                    console.log(no.valor + " * *");
-                }
-            }
+    function criarVariavel(tipo, nome, valor, escopo) {
+        var existe = tabelaSimbolos.some(function(s) {
+            return s.id === nome && s.escopo === escopo;
+        });
+        if (!existe) {
+            tabelaSimbolos.push({ tipo: tipo, id: nome, val: valor, escopo: escopo });
+            console.log('Variável criada: ' + nome + ' (' + tipo + ') no escopo ' + escopo);
         }
     }
-}
+
+    function gerarCod(resultado, op1, operador, op2) {
+        var linha = resultado + " = " + op1 + " " + operador + " " + op2;
+        tac.push(linha);
+        console.log('TAC Gerado: ' + linha);
+    }
 %}
 
 %lex
 %%
 
 \s+                                 /* ignorar brancos */
+"//".* /* ignorar comentários de linha */
+"/*"([^*]|\*+[^*/])*\*+"/"          /* ignorar comentários de bloco */
 
-/* Diretivas de C */
-"#include"[ \t]+"<"[^>\n]+">"        return 'INCLUDE_DIR';
-"#include"[ \t]+"\""[^"\n]+"\""      return 'INCLUDE_DIR';
+/* Diretivas de Pré-processamento */
+"#include"[ \t]+"<"[^>\n]+">"        return 'INCLUDE';
+"#include"[ \t]+"\""[^"\n]+"\""      return 'INCLUDE';
 "#"                                 return '#';
 "define"                            return 'DEFINE';
 
-/* Tipos */
+/* Tipos Primitivos */
 "int"                               return 'INT';
 "double"                            return 'DOUBLE';
 "float"                             return 'FLOAT';
 "char"                              return 'CHAR';
+"void"                              return 'VOID';
 
-/* Estruturas de controle */
+/* Estruturas de Fluxo e Loops */
 "if"                                return 'IF';
 "else"                              return 'ELSE';
 "while"                             return 'WHILE';
+"do"                                return 'DO_WHILE'; 
+"for"                               return 'FOR';
 "switch"                            return 'SWITCH';
 "case"                              return 'CASE';
 "break"                             return 'BREAK';
 "default"                           return 'DEFAULT';
-"var"                               return 'VAR';
-"do"                                return 'DO';
-"for"                               return 'FOR';
+"return"                            return 'RETURN';
 
-/* Símbolos e Operadores */
-"("                                 return '(';
-")"                                 return ')';
-"*"                                 return '*';
-"/"                                 return '/';
-"+"                                 return '+';
-"-"                                 return '-';
-";"                                 return ';';
-":"                                 return ':';
-"."                                 return '.';
-","                                 return ',';
-"'"                                 return 'QUOTE';
-'"'                                 return 'DQUOTE';
-"["                                 return '[';
-"]"                                 return ']';
-
-"{"                                 { escopo++; return '{'; }
-"}"                                 { escopo--; return '}'; }
+/* Operadores Expandidos do C */
+"++"                                return 'INCREMENTO';
+"+="                                return 'MAIS_IGUAL';
+"-="                                return 'MENOS_IGUAL';
+"--"                                return 'DECREMENTO';
+"sizeof"                            return 'SIZEOF';
 
 /* Operadores Relacionais e Lógicos */
 "<="                                return 'LE';
 ">="                                return 'GE';
 "=="                                return 'EQ';
 "!="                                return 'NE';
+"||"                                return 'OR';
+"&&"                                return 'AND';
+"!"                                 return 'NOT';
+"NULL"                              return 'NULL';
+"&"                                 return '&';
+\"([^\\\"]|\\.)*\"                  return 'STRING_LIT';
+
+/* Símbolos e Pontuação */
 "<"                                 return '<';
 ">"                                 return '>';
 "="                                 return '=';
-"||"                                return 'OR';
-"!"                                 return 'NOT';
-"&&"                                return 'AND';
+"("                                 return '(';
+")"                                 return ')';
+"{"                                 { escopoAtual++; return '{'; }
+"}"                                 { escopoAtual--; return '}'; }
+"["                                 return '[';
+"]"                                 return ']';
+"*"                                 return '*';
+"/"                                 return '/';
+"+"                                 return '+';
+"-"                                 return '-';
+"%"                                 return '%';
+";"                                 return ';';
+","                                 return ',';
+":"                                 return ':';
+"'"                                 return 'QUOTE';
+'"'                                 return 'DQUOTE';
 
 /* Identificadores e Literais */
-[a-zA-Z][a-zA-Z0-9_]* return 'IDF';
-[0-9]*\.[0-9]+([eE][+-][0-9]+)?     return 'F_LIT';
+[a-zA-Z_][a-zA-Z0-9_]* return 'IDF';
+[0-9]+\.[0-9]+                      return 'F_LIT';
 [0-9]+                              return 'INT_LIT';
+"'"[^"']"'"                         return 'CHAR_LIT';
 
-.                                   /* ignorar outros caracteres */
+.                                   /* ignorar outros caracteres inválidos */
 <<EOF>>                             return 'EOF';
 
 /lex
 
-%start programa
+%start expressions
 
-/* Precedências para evitar conflitos shift/reduce e loops */
+%ebnf
+
+/* Precedências explícitas e completas */
 %left OR
 %left AND
-%left EQ NE LE GE '<' '>'
+%left EQ NE
+%left '<' '>' LE GE
 %left '+' '-'
-%left '*' '/'
-%right NOT
+%left '*' '/' '%'
+%right NOT CAST INCREMENTO DECREMENTO MENOS_UNARIO
+%left '[' ']' '(' ')'
 
 %%
 
-/* >>> Gramática BNF com os Tokens Corretos <<< */
+/* >>> Gramática BNF <<< */
 
-programa
-    : elementos EOF
-    {
-        console.log("\n--- Tabela de Símbolos Final ---");
-        tabelaSimbolos.forEach(function(s) {
-            console.log(s.id + ":" + s.nome + ":" + s.tipo + ":" + s.escopo);
-        });
-        return { tipo: 'PROGRAMA', tabela: tabelaSimbolos };
-    }
+expressions
+    : inicializar elementos EOF
+        %{  
+            console.log('\n\nAnálise sintática concluída com sucesso!');
+            console.log('Análise Semântica');
+            console.log('Tabela de símbolos:\n', tabelaSimbolos); 
+            console.log('Códigos Three Address Code gerados:\n', tac);
+            console.log('Expressões contêm algum erro semântico:\n', erros);
+        %}
+    ;
+
+inicializar
+    : /* vazio */
+        %{
+            // Inicialização isolada em uma sub-regra para evitar conflitos sintáticos
+            escopoAtual = 0; 
+            tabelaSimbolos = []; 
+            tac = []; 
+            erros = []; 
+        %}
     ;
 
 elementos
@@ -201,31 +154,48 @@ elemento
     : diretiva
     | declaracao ';'
     | bloco
-    | comando_estruturado
+    | funcao
     ;
 
 diretiva
-    : INCLUDE_DIR
+    : INCLUDE
     | '#' DEFINE IDF INT_LIT
     | '#' DEFINE IDF F_LIT
     | '#' DEFINE IDF IDF
     ;
 
+funcao
+    : tipo_basico IDF '(' parametros_opt ')' bloco
+    | IDF '(' parametros_opt ')' bloco
+    ;
+
+argumentos_opt
+    : argumentos { $$ = $1; }
+    | /* vazio */ { $$ = []; }
+    ;
+
+argumentos
+    : expr { $$ = [$1]; }
+    | expr ',' argumentos { $$ = [$1].concat($3); }
+    ;
+
+parametros_opt
+    : lista_parametros
+    | /* vazio */
+    ;
+
+lista_parametros
+    : tipo_basico pointer_opt IDF ',' lista_parametros
+    | tipo_basico pointer_opt IDF
+    ;
+
+pointer_opt
+    : '*'
+    | /* vazio */
+    ;
+
 bloco
     : '{' comandos '}'
-    {
-        console.log("Árvore Sintática do Escopo: " + (escopo + 1) + "\n");
-        var atual = raiz;
-        while (atual !== null) {
-            console.log("Sub-Árvore:");
-            console.log(printArvore(atual));
-            console.log("\nÁtomos gerados:");
-            printAtomos(atual);
-            atual = atual.proximo;
-            console.log("");
-        }
-        raiz = null; 
-    }
     ;
 
 comandos
@@ -234,72 +204,137 @@ comandos
     ;
 
 comando
-    : atribuicao ';'
-    | declaracao ';'
-    | bloco
+    : declaracao ';'
+    | atribuicao ';'
+    | chamada_funcao ';'
     | comando_estruturado
+    | bloco
     | BREAK ';'
+    | RETURN expr ';'
+    | RETURN ';'
+    | ';'
+    ;
+
+chamada_funcao
+    : IDF '(' argumentos_opt ')'
     ;
 
 comando_estruturado
-    : IF '(' condicao ')' comando
-    | IF '(' condicao ')' comando ELSE comando
-    | WHILE '(' condicao ')' comando
-    | DO comando WHILE '(' condicao ')' ';'
-    | FOR '(' atribuicao ';' condicao ';' atribuicao ')' comando
+    : IF '(' expr ')' comando %prec IF
+    | IF '(' expr ')' comando ELSE comando
+    | WHILE '(' expr ')' comando
+    | DO_WHILE comando WHILE '(' expr ')' ';'
+    | FOR '(' atribuicao_for ';' expr_opt ';' atribuicao_for ')' comando
+    | SWITCH '(' expr ')' '{' casos '}'
+    ;
+
+casos
+    : CASE expr ':' comandos casos
+    | DEFAULT ':' comandos
+    | /* vazio */
+    ;
+
+atribuicao_for
+    : atribuicao
+    | declaracao
+    | expr
+    | /* vazio */
+    ;
+
+expr_opt
+    : expr
+    | /* vazio */
     ;
 
 declaracao
-    : tipo vars
+    : tipo_basico vars
     ;
 
-tipo
-    : INT    { tipoAtual = 'int'; }
-    | FLOAT  { tipoAtual = 'float'; }
-    | DOUBLE { tipoAtual = 'double'; }
-    | CHAR   { tipoAtual = 'char'; }
+tipo_basico
+    : INT    { tipoAtual = 'int'; $$ = 'int'; }
+    | FLOAT  { tipoAtual = 'float'; $$ = 'float'; }
+    | DOUBLE { tipoAtual = 'double'; $$ = 'double'; }
+    | CHAR   { tipoAtual = 'char'; $$ = 'char'; }
+    | VOID   { tipoAtual = 'void'; $$ = 'void'; }
     ;
 
 vars
-    : IDF ',' vars { criarSimbolo(tipoAtual, $1); }
-    | IDF          { criarSimbolo(tipoAtual, $1); }
+    : var_item ',' vars
+    | var_item
+    ;
+
+var_item
+    : '*' IDF
+        {
+            criarVariavel(tipoAtual + '*', $2, undefined, escopoAtual);
+        }
+    | '*' IDF '=' expr
+        {
+            criarVariavel(tipoAtual + '*', $2, $4, escopoAtual);
+        }
+    | IDF '=' expr
+        {
+            criarVariavel(tipoAtual, $1, $3, escopoAtual);
+        }
+    | IDF '[' expr ']' '=' '{' lista_valores '}'
+        {
+            criarVariavel(tipoAtual + '[]', $1, 'array', escopoAtual);
+        }
+    | IDF '[' expr ']'
+        {
+            criarVariavel(tipoAtual + '[]', $1, 'array', escopoAtual);
+        }
+    | IDF
+        {
+            criarVariavel(tipoAtual, $1, undefined, escopoAtual);
+        }
+    ;
+
+lista_valores
+    : expr ',' lista_valores
+    | expr
     ;
 
 atribuicao
     : IDF '=' expr
-    {
-        var r = criarNo("ATT", "ATT");
-        r.esquerda = criarNo($1, "IDF");
-        r.direita = $3;
-        adicionarNoRaiz(r);
-    }
+    | IDF MAIS_IGUAL expr
+    | IDF MENOS_IGUAL expr
+    | IDF INCREMENTO
+    | IDF DECREMENTO
+    | IDF '[' expr ']' '=' expr
     ;
 
-condicao
-    : expr meio_comp expr
-    | expr
-    ;
-
-meio_comp
-    : '>' | '<' | GE | LE | NE | EQ | OR | AND
-    ;
-
-/* Estrutura matemática estrita de 3 níveis para Árvore (AST) */
 expr
-    : expr '+' cnj   { $$ = criarNo("+", "OPD", $1, $3); }
-    | expr '-' cnj   { $$ = criarNo("-", "OPD", $1, $3); }
-    | cnj            { $$ = $1; }
-    ;
-
-cnj
-    : cnj '*' termo  { $$ = criarNo("*", "OPC", $1, $3); }
-    | cnj '/' termo  { $$ = criarNo("/", "OPC", $1, $3); }
-    | termo          { $$ = $1; }
-    ;
-
-termo
-    : '(' expr ')'   { $$ = $2; }
-    | IDF             { $$ = criarNo($1, "IDF"); }
-    | INT_LIT        { $$ = criarNo($1, "INT_LIT"); }
-    | F_LIT          { $$ = criarNo($1, "F_LIT"); }
+    : expr OR expr            { var temp = "t"+tac.length; gerarCod(temp, $1, "||", $3); $$ = temp; }
+    | expr AND expr           { var temp = "t"+tac.length; gerarCod(temp, $1, "&&", $3); $$ = temp; }
+    | expr EQ expr            { var temp = "t"+tac.length; gerarCod(temp, $1, "==", $3); $$ = temp; }
+    | expr NE expr            { var temp = "t"+tac.length; gerarCod(temp, $1, "!=", $3); $$ = temp; }
+    | expr LE expr            { var temp = "t"+tac.length; gerarCod(temp, $1, "<=", $3); $$ = temp; }
+    | expr GE expr            { var temp = "t"+tac.length; gerarCod(temp, $1, ">=", $3); $$ = temp; }
+    | expr '<' expr           { var temp = "t"+tac.length; gerarCod(temp, $1, "<", $3); $$ = temp; }
+    | expr '>' expr           { var temp = "t"+tac.length; gerarCod(temp, $1, ">", $3); $$ = temp; }
+    | expr '+' expr           { var temp = "t"+tac.length; gerarCod(temp, $1, "+", $3); $$ = temp; }
+    | expr '-' expr           { var temp = "t"+tac.length; gerarCod(temp, $1, "-", $3); $$ = temp; }
+    | expr '*' expr           { var temp = "t"+tac.length; gerarCod(temp, $1, "*", $3); $$ = temp; }
+    | expr '/' expr           { var temp = "t"+tac.length; gerarCod(temp, $1, "/", $3); $$ = temp; }
+    | expr '%' expr           { var temp = "t"+tac.length; gerarCod(temp, $1, "%", $3); $$ = temp; }
+    | NOT expr                { var temp = "t"+tac.length; gerarCod(temp, "!", $2, ""); $$ = temp; }
+    | '-' expr %prec MENOS_UNARIO { var temp = "t"+tac.length; gerarCod(temp, "-", $2, ""); $$ = temp; }
+    | '(' expr ')'            { $$ = $2; }
+    | '(' tipo_basico ')' expr %prec CAST
+                              { $$ = $4; }
+    | '(' tipo_basico '*' ')' expr %prec CAST
+                              { $$ = $5; }
+    | chamada_funcao          { $$ = 'call'; }
+    | IDF '[' expr ']'        { $$ = $1 + "[]"; }
+    | IDF                     { $$ = $1; }
+    | '&' IDF                 { $$ = "&" + $2; }
+    | IDF INCREMENTO          { $$ = $1; }
+    | IDF DECREMENTO          { $$ = $1; }
+    | INT_LIT                 { $$ = $1; }
+    | STRING_LIT              { $$ = $1; }
+    | F_LIT                   { $$ = $1; }
+    | CHAR_LIT                { $$ = $1; }
+    | SIZEOF '(' tipo_basico ')' { $$ = 'sizeof(' + $3 + ')'; }
+    | 'NULL'                  { $$ = 'NULL'; }
     ;
