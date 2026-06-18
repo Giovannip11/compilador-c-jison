@@ -26,7 +26,7 @@
 %%
 
 \s+                                 /* ignorar brancos */
-"//".* /* ignorar comentários de linha */
+"//"[^\n]* /* ignorar comentários de linha */
 "/*"([^*]|\*+[^*/])*\*+"/"          /* ignorar comentários de bloco */
 
 /* Diretivas de Pré-processamento */
@@ -109,7 +109,7 @@
 
 %ebnf
 
-/* Precedências explícitas e completas (incluindo MENOS_UNARIO para corrigir o "-5") */
+/* Precedências explícitas e completas */
 %left OR
 %left AND
 %left EQ NE
@@ -325,5 +325,5 @@ expr
     | F_LIT                   { $$ = $1; }
     | CHAR_LIT                { $$ = $1; }
     | SIZEOF '(' tipo_basico ')' { $$ = 'sizeof(' + $3 + ')'; }
-    | 'NULL'                  { $$ = 'NULL'; }
+    | NULL                    { $$ = 'NULL'; } /* MODIFICADO: Sem aspas simples para casar com o token */
     ;
