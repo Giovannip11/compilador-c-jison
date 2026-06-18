@@ -71,7 +71,7 @@
 "!"                                 return 'NOT';
 "NULL"                              return 'NULL';
 "&"                                 return '&';
-\"([^\\\"]|\\.)*\"                  return 'STRING_LIT';
+(\"([^\\\"]|\\.)*\")|([“”]([^\\\"]|\\.)*[“”]) return 'STRING_LIT';
 
 /* Símbolos e Pontuação */
 "<"                                 return '<';
