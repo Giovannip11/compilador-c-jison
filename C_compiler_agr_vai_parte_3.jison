@@ -1,11 +1,9 @@
-
-
 %{
     var escopoAtual = 0;
     var tabelaSimbolos = [];
     var tac = [];
     var erros = [];
-    var tipoAtual = ''; // Conforme seção 4 do PDF (Verificação de Escopo e Tipo)
+    var tipoAtual = ''; 
 
     function criarVariavel(tipo, nome, valor, escopo) {
         var existe = tabelaSimbolos.some(function(s) {
@@ -29,7 +27,7 @@
 
 \s+                                 /* ignorar brancos */
 "//".* /* ignorar comentários de linha */
-"/*"([^*]|\*+[^*/])*\*+"/"   /* ignore */
+"/*"([^*]|\*+[^*/])*\*+"/"          /* ignorar comentários de bloco */
 
 /* Diretivas de Pré-processamento */
 "#include"[ \t]+"<"[^>\n]+">"        return 'INCLUDE';
@@ -42,19 +40,19 @@
 "double"                            return 'DOUBLE';
 "float"                             return 'FLOAT';
 "char"                              return 'CHAR';
+"void"                              return 'VOID';
 
 /* Estruturas de Fluxo e Loops */
 "if"                                return 'IF';
 "else"                              return 'ELSE';
 "while"                             return 'WHILE';
-"do"                                return 'DO_WHILE'; /* Ajustado conforme a tabela de tokens do PDF */
+"do"                                return 'DO_WHILE'; 
 "for"                               return 'FOR';
 "switch"                            return 'SWITCH';
 "case"                              return 'CASE';
 "break"                             return 'BREAK';
 "default"                           return 'DEFAULT';
 "return"                            return 'RETURN';
-"void"                              return 'VOID';
 
 /* Operadores Expandidos do C */
 "++"                                return 'INCREMENTO';
@@ -111,7 +109,7 @@
 
 %ebnf
 
-/* Precedências para evitar ambiguidades matemáticas e lógicas */
+/* Precedências reestruturadas de forma plana para abranger as expressões booleanas */
 %left OR
 %left AND
 %left EQ NE LE GE '<' '>'
@@ -120,7 +118,6 @@
 %right NOT CAST INCREMENTO
 
 %%
-
 
 /* >>> Gramática BNF <<< */
 
@@ -207,10 +204,10 @@ chamada_funcao
     ;
 
 comando_estruturado
-    : IF '(' condicao ')' comando %prec IF
-    | IF '(' condicao ')' comando ELSE comando
-    | WHILE '(' condicao ')' comando
-    | DO_WHILE comando WHILE '(' condicao ')' ';'
+    : IF '(' expr ')' comando %prec IF
+    | IF '(' expr ')' comando ELSE comando
+    | WHILE '(' expr ')' comando
+    | DO_WHILE comando WHILE '(' expr ')' ';'
     | FOR '(' atribuicao_for ';' _opt ';' atribuicao_for ')' comando
     | SWITCH '(' expr ')' '{' casos '}'
     ;
@@ -229,7 +226,7 @@ atribuicao_for
     ;
 
 _opt
-    : condicao
+    : expr
     | /* vazio */
     ;
 
@@ -291,27 +288,23 @@ atribuicao
     | IDF '[' expr ']' '=' expr
     ;
 
-condicao
-    : condicao OR condicao
-    | condicao AND condicao
-    | NOT condicao
-    | expr meio_comp expr
-    | '(' condicao ')'
-    | expr
-    ;
-
-cond_termo
-    : expr meio_comp expr
-    | '(' condicao ')'
-    | expr
-    ;
-
 meio_comp
     : '>' | '<' | GE | LE | NE | EQ
     ;
 
 expr
-    : expr '+' termo_mat      { var temp = "t"+tac.length; gerarCod(temp, $1, "+", $3); $$ = temp; }
+    /* Operadores lógicos e relacionais unificados para evitar conflito de parênteses */
+    : expr OR expr            { var temp = "t"+tac.length; gerarCod(temp, $1, "||", $3); $$ = temp; }
+    | expr AND expr           { var temp = "t"+tac.length; gerarCod(temp, $1, "&&", $3); $$ = temp; }
+    | expr EQ expr            { var temp = "t"+tac.length; gerarCod(temp, $1, "==", $3); $$ = temp; }
+    | expr NE expr            { var temp = "t"+tac.length; gerarCod(temp, $1, "!=", $3); $$ = temp; }
+    | expr LE expr            { var temp = "t"+tac.length; gerarCod(temp, $1, "<=", $3); $$ = temp; }
+    | expr GE expr            { var temp = "t"+tac.length; gerarCod(temp, $1, ">=", $3); $$ = temp; }
+    | expr '<' expr           { var temp = "t"+tac.length; gerarCod(temp, $1, "<", $3); $$ = temp; }
+    | expr '>' expr           { var temp = "t"+tac.length; gerarCod(temp, $1, ">", $3); $$ = temp; }
+    | NOT expr                { var temp = "t"+tac.length; gerarCod(temp, "!", $2, ""); $$ = temp; }
+    /* Operações Matemáticas */
+    | expr '+' termo_mat      { var temp = "t"+tac.length; gerarCod(temp, $1, "+", $3); $$ = temp; }
     | expr '-' termo_mat      { var temp = "t"+tac.length; gerarCod(temp, $1, "-", $3); $$ = temp; }
     | termo_mat               { $$ = $1; }
     ;
@@ -324,34 +317,22 @@ termo_mat
     ;
 
 fator_mat
-    : '(' expr ')'
-        { $$ = $2; }
+    : '(' expr ')'            { $$ = $2; }
     | '(' tipo_basico ')' fator_mat %prec CAST
-        { $$ = $4; }
+                              { $$ = $4; }
     | '(' tipo_basico '*' ')' fator_mat %prec CAST
-        { $$ = $5; }
-    | chamada_funcao
-        { $$ = 'call'; }
-    | IDF '[' expr ']'
-        { $$ = $1 + "[]"; }
-    | IDF
-        { $$ = $1; }
-    | '&' IDF
-        { $$ = "&" + $2; }
-    | IDF INCREMENTO
-        { $$ = $1; }
-    | IDF DECREMENTO
-        { $$ = $1; }
-    | INT_LIT
-        { $$ = $1; }
-    | STRING_LIT
-        { $$ = $1; }
-    | F_LIT
-        { $$ = $1; }
-    | CHAR_LIT
-        { $$ = $1; }
+                              { $$ = $5; }
+    | chamada_funcao          { $$ = 'call'; }
+    | IDF '[' expr ']'        { $$ = $1 + "[]"; }
+    | IDF                     { $$ = $1; }
+    | '&' IDF                 { $$ = "&" + $2; }
+    | IDF INCREMENTO          { $$ = $1; }
+    | IDF DECREMENTO          { $$ = $1; }
+    | INT_LIT                 { $$ = $1; }
+    | STRING_LIT              { $$ = $1; }
+    | F_LIT                   { $$ = $1; }
+    | CHAR_LIT                { $$ = $1; }
     | SIZEOF '(' tipo_basico ')'
-        { $$ = 'sizeof(' + $3 + ')'; }
-    | 'NULL'
-        { $$ = 'NULL'; }
+                              { $$ = 'sizeof(' + $3 + ')'; }
+    | 'NULL'                  { $$ = 'NULL'; }
     ;
