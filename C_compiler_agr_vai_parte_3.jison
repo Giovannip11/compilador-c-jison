@@ -109,13 +109,15 @@
 
 %ebnf
 
-/* Precedências reestruturadas de forma plana para abranger as expressões booleanas */
+/* Precedências explícitas e completas (incluindo MENOS_UNARIO para corrigir o "-5") */
 %left OR
 %left AND
-%left EQ NE LE GE '<' '>'
+%left EQ NE
+%left '<' '>' LE GE
 %left '+' '-'
 %left '*' '/' '%'
-%right NOT CAST INCREMENTO
+%right NOT CAST INCREMENTO DECREMENTO MENOS_UNARIO
+%left '[' ']' '(' ')'
 
 %%
 
@@ -157,15 +159,13 @@ funcao
     ;
 
 argumentos_opt
-    : { $$ = []; }
-    | argumentos { $$ = $1; }
+    : argumentos { $$ = $1; }
+    | /* vazio */ { $$ = []; }
     ;
 
 argumentos
-    : expr 
-        { $$ = [$1]; }
-    | expr ',' argumentos 
-        { $$ = [$1].concat($3); }
+    : expr { $$ = [$1]; }
+    | expr ',' argumentos { $$ = [$1].concat($3); }
     ;
 
 parametros_opt
@@ -174,8 +174,13 @@ parametros_opt
     ;
 
 lista_parametros
-    : tipo_basico IDF ',' lista_parametros
-    | tipo_basico IDF
+    : tipo_basico pointer_opt IDF ',' lista_parametros
+    | tipo_basico pointer_opt IDF
+    ;
+
+pointer_opt
+    : '*'
+    | /* vazio */
     ;
 
 bloco
@@ -208,7 +213,7 @@ comando_estruturado
     | IF '(' expr ')' comando ELSE comando
     | WHILE '(' expr ')' comando
     | DO_WHILE comando WHILE '(' expr ')' ';'
-    | FOR '(' atribuicao_for ';' _opt ';' atribuicao_for ')' comando
+    | FOR '(' atribuicao_for ';' expr_opt ';' atribuicao_for ')' comando
     | SWITCH '(' expr ')' '{' casos '}'
     ;
 
@@ -225,7 +230,7 @@ atribuicao_for
     | /* vazio */
     ;
 
-_opt
+expr_opt
     : expr
     | /* vazio */
     ;
@@ -288,12 +293,7 @@ atribuicao
     | IDF '[' expr ']' '=' expr
     ;
 
-meio_comp
-    : '>' | '<' | GE | LE | NE | EQ
-    ;
-
 expr
-    /* Operadores lógicos e relacionais unificados para evitar conflito de parênteses */
     : expr OR expr            { var temp = "t"+tac.length; gerarCod(temp, $1, "||", $3); $$ = temp; }
     | expr AND expr           { var temp = "t"+tac.length; gerarCod(temp, $1, "&&", $3); $$ = temp; }
     | expr EQ expr            { var temp = "t"+tac.length; gerarCod(temp, $1, "==", $3); $$ = temp; }
@@ -302,25 +302,17 @@ expr
     | expr GE expr            { var temp = "t"+tac.length; gerarCod(temp, $1, ">=", $3); $$ = temp; }
     | expr '<' expr           { var temp = "t"+tac.length; gerarCod(temp, $1, "<", $3); $$ = temp; }
     | expr '>' expr           { var temp = "t"+tac.length; gerarCod(temp, $1, ">", $3); $$ = temp; }
+    | expr '+' expr           { var temp = "t"+tac.length; gerarCod(temp, $1, "+", $3); $$ = temp; }
+    | expr '-' expr           { var temp = "t"+tac.length; gerarCod(temp, $1, "-", $3); $$ = temp; }
+    | expr '*' expr           { var temp = "t"+tac.length; gerarCod(temp, $1, "*", $3); $$ = temp; }
+    | expr '/' expr           { var temp = "t"+tac.length; gerarCod(temp, $1, "/", $3); $$ = temp; }
+    | expr '%' expr           { var temp = "t"+tac.length; gerarCod(temp, $1, "%", $3); $$ = temp; }
     | NOT expr                { var temp = "t"+tac.length; gerarCod(temp, "!", $2, ""); $$ = temp; }
-    /* Operações Matemáticas */
-    | expr '+' termo_mat      { var temp = "t"+tac.length; gerarCod(temp, $1, "+", $3); $$ = temp; }
-    | expr '-' termo_mat      { var temp = "t"+tac.length; gerarCod(temp, $1, "-", $3); $$ = temp; }
-    | termo_mat               { $$ = $1; }
-    ;
-
-termo_mat
-    : termo_mat '*' fator_mat { var temp = "t"+tac.length; gerarCod(temp, $1, "*", $3); $$ = temp; }
-    | termo_mat '/' fator_mat { var temp = "t"+tac.length; gerarCod(temp, $1, "/", $3); $$ = temp; }
-    | termo_mat '%' fator_mat { var temp = "t"+tac.length; gerarCod(temp, $1, "%", $3); $$ = temp; }
-    | fator_mat               { $$ = $1; }
-    ;
-
-fator_mat
-    : '(' expr ')'            { $$ = $2; }
-    | '(' tipo_basico ')' fator_mat %prec CAST
+    | '-' expr %prec MENOS_UNARIO { var temp = "t"+tac.length; gerarCod(temp, "-", $2, ""); $$ = temp; }
+    | '(' expr ')'            { $$ = $2; }
+    | '(' tipo_basico ')' expr %prec CAST
                               { $$ = $4; }
-    | '(' tipo_basico '*' ')' fator_mat %prec CAST
+    | '(' tipo_basico '*' ')' expr %prec CAST
                               { $$ = $5; }
     | chamada_funcao          { $$ = 'call'; }
     | IDF '[' expr ']'        { $$ = $1 + "[]"; }
@@ -332,7 +324,6 @@ fator_mat
     | STRING_LIT              { $$ = $1; }
     | F_LIT                   { $$ = $1; }
     | CHAR_LIT                { $$ = $1; }
-    | SIZEOF '(' tipo_basico ')'
-                              { $$ = 'sizeof(' + $3 + ')'; }
+    | SIZEOF '(' tipo_basico ')' { $$ = 'sizeof(' + $3 + ')'; }
     | 'NULL'                  { $$ = 'NULL'; }
     ;
